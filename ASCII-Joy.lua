@@ -1134,30 +1134,53 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 -------- END Cast Bar
 
 -------- Experience Bar
-    if (ascii.settings.options.exp == true) then     --  99 Squares? VVV  VVV So there isn't always an empty one at 99.9 percent.
+    if (ascii.settings.options.exp == true) then     -- 99 underscores in the bar strings below
         if (player ~= nil) then
             local ExpStr = '';
             local ExpNeed = 0;
             local ExpCurr = 0;
             local ExtraStr = '';
-            if(player:GetIsLimitModeEnabled() == true or ExpCurr == ExpNeed) then -- Can only happen if at max level?
-                ExpStr = '||cff00ffff|___________________________________________________________________________________________________|cffffffff||'
+            local TNLStr = '';
+            local PercentStr = '';
+            
+            if(player:GetIsLimitModeEnabled() == true) then -- At max level, show limit points
+                ExpStr = '|cff00ffff|__________________________________________________|r'
                 ExpNeed = 10000;
                 ExpCurr = player:GetLimitPoints();
-                ExtraStr = tostring('|cff00ffff| '..player:GetMeritPoints());
+                ExtraStr = ' |cff00ffff|Merit: '..player:GetMeritPoints()..'|r';
+                -- For limit points, show TNL as remaining limit points and percentage
+                local TNL = ExpNeed - ExpCurr;
+                TNLStr = string.format('|cff00ffff|TNL: %d|r', TNL);
             else
-                ExpStr = '||cffffff00|___________________________________________________________________________________________________|cffffffff||'
+                -- Get current experience values for normal levels
                 ExpNeed = player:GetExpNeeded();
                 ExpCurr = player:GetExpCurrent();
+                ExpStr = '|cffffff00|__________________________________________________|r'
+                ExtraStr = ' |cffffff00|'..ExpCurr..'/'..ExpNeed..'|r';
+                -- Calculate TNL (To Next Level)
+                local TNL = ExpNeed - ExpCurr;
+                TNLStr = string.format('|cffffff00|TNL: %d|r', TNL);
             end
 
-            local ExpPer = 100 * (ExpCurr/ExpNeed);
-            local ExpChk = math.floor(ExpPer / (100/100)); -- DENOMINATOR OF FRACTION IS HOW MANY SQUARES WE USE FOR BAR!!!!
+            -- Prevent division by zero and calculate percentage
+            local ExpPer = 0;
+            if (ExpNeed > 0) then
+                ExpPer = 100 * (ExpCurr/ExpNeed);
+            end
+            
+            -- Format percentage string
+            PercentStr = string.format('|cffffffff|%.1f%%|r', ExpPer);
+            
+            local ExpChk = math.floor(ExpPer / (100/50)); -- 50 squares for the bar (matches underscore count)
             ExpStr = string.gsub(ExpStr,'_','#',ExpChk);
             ExpStr = string.gsub(ExpStr,'_',' ');
+            
+            -- Create the info line with TNL (left), percentage (middle), merit/exp (right)
+            local InfoLine = TNLStr .. '                    ' .. PercentStr .. '                    ' .. ExtraStr;
+            
             ascii.font_d.visible = true;
             ascii.font_d.font_height = 12;
-            ascii.font_d.text = ExpStr..ExtraStr;
+            ascii.font_d.text = ExpStr .. '\n' .. InfoLine;
         end
     end
 -------- EBD Experience Bar
@@ -1850,11 +1873,24 @@ ashita.events.register('d3d_present', 'present_cb', function ()
             end
             centerjust = true; -- started this at true, so let's put it back there.
 
-            MobHPCheck = math.floor(MobHPP / (100/46)); -- DENOMINATOR OF FRACTION IS HOW MANY SQUARES WE USE FOR BAR!!!!
-           --[[MobStr = tostring(MobHPP);  ------ Let's not put Monster HP% in for now, defeats purpose of the bar.
-            while MobStr:len() < 3 do 
-                MobStr = " "..MobStr; 
-            end  ]]
+            -- Color-coded monster HP percentage
+local MobColor = '|cff00ff00|'; -- Default: Green (Healthy)
+
+if (MobHPP >= 75) then
+    MobColor = '|cff00ff00|'; -- Green
+elseif (MobHPP >= 50) then
+    MobColor = '|cffffff00|'; -- Yellow
+elseif (MobHPP >= 25) then
+    MobColor = '|cffffA000|'; -- Orange
+elseif (MobHPP > 0) then
+    MobColor = '|cffff0000|'; -- Red
+else
+    MobColor = '|cffaf0000|'; -- Dark Red / Dead
+end
+
+local MobStr = string.format("%s%3d%%|r", MobColor, MobHPP);  -- Colored percentage (keeping 3 digits for proper spacing)
+MobHPCheck = math.floor(MobHPP / (100 / 46)); -- 46 is the bar length
+-- Initial mobResult will be overwritten below for actual HP bars
             if (spawn == 16) then
                 local MobHPColor = '|cffff0000|';
                 if (ascii.settings.options.aggro == true) then
@@ -1872,12 +1908,14 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 
                 mobResult = string.gsub(mobResult,'_','#',MobHPCheck);
                 mobResult = string.gsub(mobResult,'_',' ');
-                mobResult = ''..MobStr..'|cffffffff||'..mobResult..'|cffffffff||';
+                -- Format HP percentage with bar, keeping within window bounds
+                mobResult = MobStr..' '..mobResult;
             elseif ((spawn == 1 or spawn == 4 or spawn == 8 or spawn == 9 or spawn == 13) and ascii.settings.options.tarplay == true) then
                 mobResult = '|cff00ff44|_____________________________________________'
                 mobResult = string.gsub(mobResult,'_','#',MobHPCheck);
                 mobResult = string.gsub(mobResult,'_',' ');
-                mobResult = ''..MobStr..'|cffffffff||'..mobResult..'|cffffffff||';
+                -- Format HP percentage with bar, keeping within window bounds
+                mobResult = MobStr..' '..mobResult;
                 GotMob = 0; -- Anytime our target isn't a mob (spawn == 16), make this 0.
                 ascii.font_o.visible = false;
                 ascii.font_l.visible = false;
